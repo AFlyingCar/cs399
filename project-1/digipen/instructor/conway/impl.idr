@@ -16,12 +16,23 @@ GetValueFrom idx err_val Nil = err_val
 GetValueFrom idx err_val list = maybe err_val id (Prelude.List.index' idx list)
 
 public export
+GetValueFrom2D : (Nat,Nat) -> Lazy a -> List (List a) -> a
+GetValueFrom2D pos err_val Nil = err_val
+GetValueFrom2D (x,y) err_val list = GetValueFrom x err_val (GetValueFrom y Nil list)
+
+public export
 record World a where
   constructor MkWorld
   area : Area
   cells : List (List Bool)
 
   value : a
+
+public export
+GetNeighborCount : Position -> World () -> Nat
+
+public export
+GetNCBoard : World a -> List(List Nat)
 
 public export
 implementation GameOfLife World where
@@ -38,15 +49,25 @@ implementation GameOfLife World where
                              xs = enumFromTo( min x1 x2 )( max x1 x2 )
                              ys = enumFromTo( min y1 y2 )( max y1 y2 )
                          in
-                           MkWorld area [[live_func (x,y) | y <- ys] | x <- xs] ()
+                           MkWorld area [[live_func (x,y) | x <- xs] | y <- ys] ()
 
   -- Produce a new LifeWorld state and return its liveness function.
   -- evolve : LifeWorld a -> LifeWorld( Position -> Bool )
   evolve (MkWorld area cells _) = MkWorld area cells
-                               (\pos => let num_neigh = value (countNeighbors (cell pos (MkWorld area cells ()))) in
-                                        if num_neigh < 2 then False else
-                                          if num_neigh ==  2 || num_neigh == 3 then True else
-                                            if num_neigh == 3 then True else False)
+                                  (\(x,y) => let nc_board = GetNCBoard (MkWorld area cells ())
+                                                 num_neigh = GetValueFrom2D (toNat x, toNat y) 0 nc_board
+                                                 world = MkWorld area cells ()
+                                                 is_live = snd (value (cell (x,y) (MkWorld area cells ())))
+                                             in
+                                             if is_live && num_neigh < 2 then False else
+                                               if is_live && (num_neigh ==  2 || num_neigh == 3) then True else
+                                                 if is_live && num_neigh > 3 then False else
+                                                   if (not is_live) && num_neigh == 3 then True else is_live)
+
+--                                (\pos => let num_neigh = value (countNeighbors (cell pos (MkWorld area cells ()))) in
+--                                         if num_neigh < 2 then False else
+--                                           if num_neigh ==  2 || num_neigh == 3 then True else
+--                                             if num_neigh > 3 then False else False)
 
   -- Create a way to look up information about a cell within some
   -- LifeWorld's context.
@@ -54,7 +75,7 @@ implementation GameOfLife World where
   cell (x, y) (MkWorld area cells _) = let Extents(x1,y1)(x2,y2) = area in
                                           MkWorld area cells
                                             ((x, y),
-                                              (GetValueFrom (toNat (y - y1)) False (GetValueFrom (toNat (x - x1)) Nil cells)))
+                                             (GetValueFrom2D (toNat (x - x1), toNat (y - y1)) False cells))
 
   -- Check how many neighbors some cell has.
   -- countNeighbors : LifeWorld Cell -> LifeWorld Nat
@@ -62,10 +83,14 @@ implementation GameOfLife World where
                                                    ((x,y), _) = value
                                                in
                                           MkWorld area cells (
-                                            BoolToNat (GetValueFrom (toNat (y + 1 - y1)) False (GetValueFrom (toNat (x - x1))     Nil cells)) +
-                                            BoolToNat (GetValueFrom (toNat (y - 1 - y1)) False (GetValueFrom (toNat (x - x1))     Nil cells)) +
-                                            BoolToNat (GetValueFrom (toNat (y - y1))     False (GetValueFrom (toNat (x + 1 - x1)) Nil cells)) +
-                                            BoolToNat (GetValueFrom (toNat (y - y1))     False (GetValueFrom (toNat (x - 1 - x1)) Nil cells))
+                                            BoolToNat (GetValueFrom2D (toNat (x - x1), toNat (y + 1 - y1)) False cells) +
+                                            BoolToNat (GetValueFrom2D (toNat x,        toNat (y + 1 - y1)) False cells) +
+                                            BoolToNat (GetValueFrom2D (toNat (x + x1), toNat (y + 1 - y1)) False cells) +
+                                            BoolToNat (GetValueFrom2D (toNat (x - x1), toNat y) False cells) +
+                                            BoolToNat (GetValueFrom2D (toNat (x + x1), toNat y) False cells) +
+                                            BoolToNat (GetValueFrom2D (toNat (x - x1), toNat (y - 1 - y1)) False cells) +
+                                            BoolToNat (GetValueFrom2D (toNat x,        toNat (y - 1 - y1)) False cells) +
+                                            BoolToNat (GetValueFrom2D (toNat (x + x1), toNat (y - 1 - y1)) False cells)
                                           )
 
   -- Check if some cell is alive.
@@ -76,4 +101,15 @@ implementation GameOfLife World where
   -- extract : LifeWorld a -> a
   extract world = value world
 
+-- GetNeighborCount : Position -> World () -> Nat
+GetNeighborCount (x,y) (MkWorld area cells _) =
+  value (countNeighbors (cell (x,y) (MkWorld area cells ())))
+
+-- GetNCBoard : World a -> List(List Nat)
+GetNCBoard (MkWorld (Extents(x1,y1)(x2,y2)) cells _) =
+      let world = MkWorld (Extents(x1,y1)(x2,y2)) cells ()
+          xs = enumFromTo( min x1 x2 )( max x1 x2 )
+          ys = enumFromTo( min y1 y2 )( max y1 y2 )
+      in
+      [[(GetNeighborCount (x,y) world) | x <- xs ] | y <- ys ]
 
