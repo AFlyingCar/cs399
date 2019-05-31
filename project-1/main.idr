@@ -3,8 +3,9 @@ import digipen.instructor.conway.spec
 import digipen.instructor.conway.impl
 
 area0 : Area
-area0 = Extents(0,0)(5,5)
+area0 = Extents(0,0)(10,10)
 
+-- Blinker
 board0 : List (List Bool)
 board0 = [[False, False, False, False, False],
           [False, True, True, True, False],
@@ -12,15 +13,35 @@ board0 = [[False, False, False, False, False],
           [False, False, False, False, False],
           [False, False, False, False, False]]
 
-world0 : World ()
-world0 = start area0 (\(x,y) => GetValueFrom (toNat x) False (GetValueFrom (toNat y) Nil board0) )
+-- Beacon
+board1 : List (List Bool)
+board1 = [[False, False, False, False, False],
+          [False, True, True, False, False],
+          [False, True, True, False, False],
+          [False, False, False, True, True],
+          [False, False, False, True, True]]
 
+-- Glider
+board2 : List (List Bool)
+board2 = [[False, False, True, False, False],
+          [True, False, True, False, False],
+          [False, True, True, False, False],
+          [False, False, False, False, False],
+          [False, False, False, False, False]]
+
+-- Different stages of evolution for the world, for ease of use
+world0 : World ()
+world0 = start area0 (\(x,y) => GetValueFrom (toNat x) False (GetValueFrom (toNat y) Nil board2) )
 world1 : World (Position->Bool)
 world1 = evolve world0
+world2 : World (Position->Bool)
+world2 = evolve world1
+world3 : World (Position->Bool)
+world3 = evolve world2
+world4 : World (Position->Bool)
+world4 = evolve world3
 
-check_w1 : (Position->Bool)
-check_w1 = value world1
-
+-- Helper function to draw the board, but with neighbor counts rather than live/dead
 drawBoardNC : List(List Nat) -> IO ()
 drawBoardNC board_nc = sequence_( map( putStrLn . rowString ) ys ) where
   xs : List Int
@@ -37,18 +58,14 @@ drawBoardNC board_nc = sequence_( map( putStrLn . rowString ) ys ) where
   rowString : Int -> String
   rowString y = unwords (map(\x => cellString (x,y)) xs)
 
+-- The Neighbor Count board of different stages of the world evolution, for ease of use
 ncb0 : List (List Nat)
 ncb0 = GetNCBoard world0
+ncb1 : List (List Nat)
+ncb1 = GetNCBoard world1
 
 main : IO ()
--- main = let ld = Prelude.Basics.snd (value (cell (2,1) world0)) in
---           putStrLn (if ld then "Live" else "Dead")
--- main = putStrLn (show (value (countNeighbors (cell (2,1) world0))))
--- main = putStrLn (show (check_w1 (0,0)))
-main = (drawBoardNC ncb0)
--- main = putStrLn (show (GetValueFrom2D (2,1) False board0))
--- main = putStrLn (show (value (isLive (cell (2,1) world0))))
--- main = drawBoard area0 (\(x,y) => GetValueFrom (toNat x) False (GetValueFrom (toNat y) Nil board0) ) -- 0
--- main = drawBoard area0 (value (evolve world0))                                                    -- 1
--- main = drawBoard area0 (value (evolve (evolve world0)))                                           -- 2
+-- main = (drawBoardNC ncb0)
+-- main = drawBoard area0 (\(x,y) => GetValueFrom (toNat x) False (GetValueFrom (toNat y) Nil board2) ) -- 0
+main = drawBoard area0 (value world4)                                                                -- N
 
