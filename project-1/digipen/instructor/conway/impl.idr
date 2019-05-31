@@ -21,6 +21,15 @@ GetValueFrom2D pos err_val Nil = err_val
 GetValueFrom2D (x,y) err_val list = GetValueFrom x err_val (GetValueFrom y Nil list)
 
 public export
+CreateEvolvedBoard : Area->(Position->Bool)->List (List Bool)
+CreateEvolvedBoard (Extents(x1,y1)(x2,y2)) live_func =
+  let xs = enumFromTo( min x1 x2 )( max x1 x2 )
+      ys = enumFromTo( min y1 y2 )( max y1 y2 )
+  in
+  [[live_func (x,y) | x <- xs] | y <- ys]
+
+
+public export
 record World a where
   constructor MkWorld
   area : Area
@@ -33,6 +42,18 @@ GetNeighborCount : Position -> World () -> Nat
 
 public export
 GetNCBoard : World a -> List(List Nat)
+
+-- EvolveCell : Area -> List(List Bool) Position -> Bool
+-- EvolveCell area cells (x,y) = let nc_board = GetNCBoard (MkWorld area cells ())
+--                                   num_neigh = GetValueFrom2D (toNat x, toNat y) 0 nc_board
+--                                   world = MkWorld area cells ()
+--                                   is_live = snd (value (cell (x,y) (MkWorld area cells ())))
+--                               in
+--                               if is_live && num_neigh < 2 then False else
+--                                 if is_live && (num_neigh ==  2 || num_neigh == 3) then True else
+--                                   if is_live && num_neigh > 3 then False else
+--                                     if (not is_live) && num_neigh == 3 then True else is_live)
+
 
 public export
 implementation GameOfLife World where
@@ -53,16 +74,20 @@ implementation GameOfLife World where
 
   -- Produce a new LifeWorld state and return its liveness function.
   -- evolve : LifeWorld a -> LifeWorld( Position -> Bool )
-  evolve (MkWorld area cells _) = MkWorld area cells
-                                  (\(x,y) => let nc_board = GetNCBoard (MkWorld area cells ())
-                                                 num_neigh = GetValueFrom2D (toNat x, toNat y) 0 nc_board
-                                                 world = MkWorld area cells ()
-                                                 is_live = snd (value (cell (x,y) (MkWorld area cells ())))
-                                             in
-                                             if is_live && num_neigh < 2 then False else
-                                               if is_live && (num_neigh ==  2 || num_neigh == 3) then True else
-                                                 if is_live && num_neigh > 3 then False else
-                                                   if (not is_live) && num_neigh == 3 then True else is_live)
+  evolve (MkWorld area cells _) = MkWorld area new_board (\ (x,y) => GetValueFrom2D (toNat x, toNat y) False new_board) where
+                                  live_func : Position->Bool
+                                  live_func (x,y) = let nc_board = GetNCBoard (MkWorld area cells ())
+                                                        num_neigh = GetValueFrom2D (toNat x, toNat y) 0 nc_board
+                                                        world = MkWorld area cells ()
+                                                        is_live = snd (value (cell (x,y) (MkWorld area cells ())))
+                                                    in
+                                                    if is_live && num_neigh < 2 then False else                         -- < 2 cells    ==> Death
+                                                      if is_live && (num_neigh ==  2 || num_neigh == 3) then True else  -- 2 or 3 cells ==> Continue Living
+                                                        if is_live && num_neigh > 3 then False else                     -- > 3 cells    ==> Death
+                                                          if (not is_live) && num_neigh == 3 then True else is_live     -- 3 cells      ==> Live
+                                                                                                                        -- Otherwise    ==> Ignore
+                                  new_board : List (List Bool)
+                                  new_board = CreateEvolvedBoard area live_func
 
 --                                (\pos => let num_neigh = value (countNeighbors (cell pos (MkWorld area cells ()))) in
 --                                         if num_neigh < 2 then False else
@@ -83,14 +108,16 @@ implementation GameOfLife World where
                                                    ((x,y), _) = value
                                                in
                                           MkWorld area cells (
-                                            BoolToNat (GetValueFrom2D (toNat (x - x1), toNat (y + 1 - y1)) False cells) +
-                                            BoolToNat (GetValueFrom2D (toNat x,        toNat (y + 1 - y1)) False cells) +
-                                            BoolToNat (GetValueFrom2D (toNat (x + x1), toNat (y + 1 - y1)) False cells) +
-                                            BoolToNat (GetValueFrom2D (toNat (x - x1), toNat y) False cells) +
-                                            BoolToNat (GetValueFrom2D (toNat (x + x1), toNat y) False cells) +
-                                            BoolToNat (GetValueFrom2D (toNat (x - x1), toNat (y - 1 - y1)) False cells) +
-                                            BoolToNat (GetValueFrom2D (toNat x,        toNat (y - 1 - y1)) False cells) +
-                                            BoolToNat (GetValueFrom2D (toNat (x + x1), toNat (y - 1 - y1)) False cells)
+                                            BoolToNat (GetValueFrom2D (toNat (x - x1 + 1), toNat (y + 1 - y1)) False cells) +
+                                            BoolToNat (GetValueFrom2D (toNat (x - x1),     toNat (y + 1 - y1)) False cells) +
+                                            BoolToNat (GetValueFrom2D (toNat (x - x1 - 1), toNat (y + 1 - y1)) False cells) +
+
+                                            BoolToNat (GetValueFrom2D (toNat (x - x1 + 1), toNat (y - y1)) False cells) +
+                                            BoolToNat (GetValueFrom2D (toNat (x - x1 - 1), toNat (y - y1)) False cells) +
+
+                                            BoolToNat (GetValueFrom2D (toNat (x - x1 + 1), toNat (y - 1 - y1)) False cells) +
+                                            BoolToNat (GetValueFrom2D (toNat (x - x1),     toNat (y - 1 - y1)) False cells) +
+                                            BoolToNat (GetValueFrom2D (toNat (x - x1 - 1), toNat (y - 1 - y1)) False cells)
                                           )
 
   -- Check if some cell is alive.
