@@ -1,5 +1,15 @@
-install:
-	idris --install test.ipkg
+IDRIS=idris
+
+PACKAGES=-p contrib -p gl -p glfw
+SOURCES=$(wildcard *.idr)
+OUT=pong
+IFLAGS=#--total
+
+IBCS=$(wildcard *.ibc)
+
+all:
+	$(IDRIS) $(PACKAGES) $(SOURCES) $(IFLAGS) -o $(OUT)
 
 clean:
-	idris --clean test.ipkg
+	$(RM) $(IBCS) $(OUT)
+
