@@ -1,4 +1,0 @@
-package project
-opts = "-p glfw -p gl -p contrib" 
-executable = project
-main = Main
