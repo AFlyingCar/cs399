@@ -1,5 +1,7 @@
 module Main
 
+import Data.Matrix.Algebraic
+
 import Graphics.Rendering.Gl.Types
 import Graphics.Rendering.Gl.Buffers
 import Graphics.Rendering.Gl.Gl41
@@ -7,10 +9,30 @@ import Graphics.Rendering.Gl
 import Graphics.Util.Glfw
 import Graphics.Rendering.Config
 
+-- Vect
+import Data.Vect
+-- translate
+import Graphics.Util.Transforms
+
 import Pong
 
 %include C "GL/glew.h"
 %flag C "-lGLEW -lGL -lglfw"
+
+projection : TransformationMatrix
+projection = perspectiveProjection (Radians 45) (800.0 / 600.0) (0.1, 10)
+-- projection = orthographicProjection (0, 800) (0, 600) (NEARPLANE, FARPLANE)
+
+public export
+matrixToList: (Vect n (Vect m Double)) -> List Double
+matrixToList Nil = []
+matrixToList matrix = reverse (accumMatrixValues matrix []) where
+    accumMatrixValues: (Vect n (Vect m Double)) -> List Double -> List Double
+    accumMatrixValues Nil values = values
+    accumMatrixValues (row :: rest) values = accumMatrixValues rest (accumRowValues row values) where
+        accumRowValues: (Vect m Double) -> List Double -> List Double
+        accumRowValues Nil values = values
+        accumRowValues (val :: rest) values = accumRowValues rest (val :: values)
 
 errToStr : GLenum -> String
 errToStr err = case err of
@@ -97,15 +119,28 @@ destroyShaders (MkShaders shader1 shader2 program) = do
   glDeleteProgram program
   pure ()
 
+elements : List Int
+elements = [ 0, 1, 2, 1, 3, 2 ]
+
 vertices : List (Double, Double, Double, Double)
 vertices = [
-    ( -0.8, -0.8, 0.0, 1.0),
-    (  0.0,  0.8, 0.0, 1.0),
-    (  0.8, -0.8, 0.0, 1.0)
+  (0.0, 0.0, 0.0, 1.0),
+  (0.1, 0.0, 0.0, 1.0),
+  (0.0, 0.5, 0.0, 1.0),
+  (0.1, 0.5, 0.0, 1.0)
+  ]
+
+puck_verts : List (Double, Double, Double, Double)
+puck_verts = [
+  (0.0, 0.0, 0.0, 1.0),
+  (0.5, 0.0, 0.0, 1.0),
+  (0.0, 0.5, 0.0, 1.0),
+  (0.5, 0.5, 0.0, 1.0)
   ]
 
 colors : List (Double, Double, Double, Double)
 colors = [
+    (0.9, 0.9, 0.9, 1.0),
     (0.9, 0.9, 0.9, 1.0),
     (0.9, 0.9, 0.9, 1.0),
     (0.9, 0.9, 0.9, 1.0)
@@ -116,6 +151,7 @@ record Vao where
   id : Int
   buffer1 : Int
   buffer2 : Int
+  ebuffer : Int
 
 
 flatten : List (Double, Double, Double, Double) -> List Double
@@ -132,13 +168,18 @@ createBuffers = do
   (vao :: _) <- glGenVertexArrays 1
   glBindVertexArray vao
 
-  (buffer :: colorBuffer :: _) <- glGenBuffers 2
-  glBindBuffer GL_ARRAY_BUFFER buffer
+  (buffer :: elementBuffer :: colorBuffer :: _) <- glGenBuffers 3
 
   let data1 = (flatten vertices)
   ptr <- doublesToBuffer data1
-  glBufferData GL_ARRAY_BUFFER (ds * (cast $ length data1)) ptr GL_STATIC_DRAW
+  glBindBuffer GL_ARRAY_BUFFER buffer
+  glBufferData GL_ARRAY_BUFFER  (ds * (cast $ length data1)) ptr GL_STATIC_DRAW
   free ptr
+
+  eptr <- intsToBuffer elements
+  glBindBuffer GL_ELEMENT_ARRAY_BUFFER elementBuffer
+  glBufferData GL_ELEMENT_ARRAY_BUFFER (ds * (cast $ length elements)) eptr GL_STATIC_DRAW
+  free eptr
 
   showError "vertex buffer data "
   glEnableVertexAttribArray 0
@@ -155,7 +196,7 @@ createBuffers = do
   glVertexAttribPointer 1 4 GL_DOUBLE GL_FALSE 0 prim__null
   showError "color buffer "
 
-  pure $ MkVao vao buffer colorBuffer
+  pure $ MkVao vao buffer colorBuffer elementBuffer
 
 createUniforms : Int -> IO Uniforms
 createUniforms program = do
@@ -166,13 +207,13 @@ createUniforms program = do
   pure $ MkUniforms transform
 
 destroyBuffers : Vao -> IO ()
-destroyBuffers (MkVao vao buffer colorBuffer) = do
+destroyBuffers (MkVao vao buffer colorBuffer ebuffer) = do
   glDisableVertexAttribArray 1
   glDisableVertexAttribArray 0
 
   glBindBuffer GL_ARRAY_BUFFER 0
 
-  glDeleteBuffers 2 [buffer, colorBuffer]
+  glDeleteBuffers 3 [buffer, colorBuffer, ebuffer]
 
   glBindVertexArray 0
 
@@ -188,11 +229,22 @@ draw (MkState win vao (MkShaders _ _ prog ) (MkUniforms transform) pong) = do
     glClear GL_COLOR_BUFFER_BIT
     glClear GL_DEPTH_BUFFER_BIT
     glUseProgram prog
-    glUniform2dv transform 1 [P1_XPOSITION, (p1_height pong)]
-    showAllErrors "glUniform2dv "
-    -- glUniformMatrix4dv transform 1 GL_FALSE (getPlayer1Transform pong)
+
+    -- Draw Player1
+    glUniformMatrix4fv transform 1 GL_TRUE (matrixToList ((getPlayer1Transform pong)))
     glBindVertexArray (id vao)
-    glDrawArrays GL_TRIANGLES 0 3
+    glDrawElements GL_TRIANGLES 6 GL_UNSIGNED_INT prim__null
+
+    -- Draw Player2
+    glUniformMatrix4fv transform 1 GL_TRUE (matrixToList ((getPlayer2Transform pong)))
+    glBindVertexArray (id vao)
+    glDrawElements GL_TRIANGLES 6 GL_UNSIGNED_INT prim__null
+
+    -- Draw the Puck
+    glUniformMatrix4fv transform 1 GL_TRUE (matrixToList ((getPuckTransform pong)))
+    glBindVertexArray (id vao)
+    glDrawElements GL_TRIANGLES 6 GL_UNSIGNED_INT prim__null
+
     glfwSwapBuffers win
 
 
@@ -235,7 +287,7 @@ main = do
       | Left err => printLn err
     vao <- createBuffers
     uniforms <- createUniforms (program shaders)
-    eventLoop( MkState win vao shaders uniforms (MkPongState (0, 0) CENTER DEFAULT_VELOCITY CENTERY CENTERY)) -- TODO
+    eventLoop( MkState win vao shaders uniforms (MkPongState (0, 0) CENTER DEFAULT_VELOCITY HALF_DIMY HALF_DIMY)) -- TODO
     destroyBuffers vao
     destroyShaders shaders
     glfwDestroyWindow win

@@ -12,11 +12,31 @@ DIMENSIONX = 800
 
 public export
 DIMENSIONY:  Int
-DIMENSIONY = 400 
+DIMENSIONY = 600 
+
+public export
+HALF_DIMY: Double
+HALF_DIMY = (cast DIMENSIONY) / 2
 
 public export
 DIMENSIONS:  (Int, Int)
 DIMENSIONS = (DIMENSIONX, DIMENSIONY)
+
+public export 
+FOV: Angle
+FOV = Degree 45.0
+
+public export
+ASPECT: Double
+ASPECT = (cast DIMENSIONX) / (cast DIMENSIONY)
+
+public export 
+NEARPLANE: Double
+NEARPLANE = 0.1
+
+public export
+FARPLANE: Double
+FARPLANE = 10
 
 public export
 CENTERX:  Double
@@ -41,11 +61,27 @@ DT = 0.1
 
 public export
 P1_XPOSITION: Double
-P1_XPOSITION = 5
+P1_XPOSITION = -0.8
 
 public export
 P2_XPOSITION: Double
-P2_XPOSITION = (cast DIMENSIONX) - 5
+P2_XPOSITION = 0.8
+
+public export
+Z_COORDINATE: Double
+Z_COORDINATE = 0
+
+public export
+MOVE_SPEED: Double
+MOVE_SPEED = 1
+
+public export
+MAX_Y_VALUE: Double
+MAX_Y_VALUE = (cast DIMENSIONY) - 200
+
+public export
+MIN_Y_VALUE: Double
+MIN_Y_VALUE = 50
 
 -- (P1 Score, P2 Score) (PuckX, PuckY) P1Height P2Height
 public export
@@ -92,29 +128,34 @@ getKeyState win key = (state (glfwGetFunctionKey win key)) where
     state: IO KeyEventTy -> KeyEventTy
     state keystate = unsafePerformIO keystate
 
+public export
+worldYPosToScreenYPos: Double -> Double
+worldYPosToScreenYPos y = (y - HALF_DIMY) / HALF_DIMY
+
 -- https://www.youtube.com/watch?v=6LJExJ7vpYg
 public export
-matrixToList: (Vect n (Vect m Double)) -> List Double
-matrixToList Nil = []
-matrixToList matrix = accumMatrixValues matrix [] where
-    accumMatrixValues: (Vect n (Vect m Double)) -> List Double -> List Double
-    accumMatrixValues Nil values = values
-    accumMatrixValues (row :: rest) values = accumMatrixValues rest (accumRowValues row values) where
-        accumRowValues: (Vect m Double) -> List Double -> List Double
-        accumRowValues Nil values = values
-        accumRowValues (val :: rest) values = accumRowValues rest (val :: values)
+getPlayer1Transform: PongState -> TransformationMatrix
+getPlayer1Transform (MkPongState _ _ _ h _) = translate [P1_XPOSITION, worldYPosToScreenYPos h, 0]
 
 public export
-getPlayer1Transform: PongState -> List Double
-getPlayer1Transform (MkPongState _ _ _ h _) = matrixToList (translate [P1_XPOSITION, h, 1.0])
+getPlayer2Transform: PongState -> TransformationMatrix
+getPlayer2Transform (MkPongState _ _ _ _ h) = translate [P2_XPOSITION, worldYPosToScreenYPos h, 0]
 
 public export
-getPlayer2Transform: PongState -> List Double
-getPlayer2Transform (MkPongState _ _ _ _ h) = matrixToList (translate [P2_XPOSITION, h, 1.0])
+getPuckTransform: PongState -> TransformationMatrix
+getPuckTransform (MkPongState _ (x, y) _ _ _) = translate [x, y, 1.0]
 
 public export
-getPuckTransform: PongState -> List Double
-getPuckTransform (MkPongState _ (x, y) _ _ _) = matrixToList (translate [x, y, 1.0])
+movePlayerUp: Double -> Double
+movePlayerUp height = if height >= MAX_Y_VALUE -- TODO
+                          then height
+                          else height + MOVE_SPEED
+
+public export
+movePlayerDown: Double -> Double
+movePlayerDown height = if height <= MIN_Y_VALUE
+                           then height
+                           else height - MOVE_SPEED
 
 public export
 gameLoop: GlfwWindow -> PongState -> PongState
@@ -127,8 +168,8 @@ gameLoop win pongState@(MkPongState (p1_score, p2_score) (puckx, pucky) vel p1_h
 
     -- TODO: How shall we update p2_height?
     if up_key == GLFW_PRESS
-        then MkPongState new_score new_puck_pos new_puck_vel (p1_height + 1) (p2_height)
+        then MkPongState new_score new_puck_pos new_puck_vel (movePlayerUp p1_height) (p2_height)
     else if down_key == GLFW_PRESS
-        then MkPongState new_score new_puck_pos new_puck_vel (p1_height - 1) (p2_height)
+        then MkPongState new_score new_puck_pos new_puck_vel (movePlayerDown p1_height) (p2_height)
         else MkPongState new_score new_puck_pos new_puck_vel p1_height p2_height
 
