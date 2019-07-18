@@ -15,6 +15,10 @@ DIMENSIONY:  Int
 DIMENSIONY = 600 
 
 public export
+HALF_DIMX: Double
+HALF_DIMX = (cast DIMENSIONX) / 2
+
+public export
 HALF_DIMY: Double
 HALF_DIMY = (cast DIMENSIONY) / 2
 
@@ -52,7 +56,7 @@ CENTER = (CENTERX, CENTERY)
 
 public export
 DEFAULT_VELOCITY: (Double, Double)
-DEFAULT_VELOCITY = (1, 0)
+DEFAULT_VELOCITY = (-2, 0)
 
 -- TODO: Should this be hardcoded??
 public export
@@ -123,14 +127,24 @@ updatePuckVel pos@(x,y) old_vel@(i, j) = if (x <= 0) || (x >= (cast DIMENSIONX))
                                                 else (i, j)
 
 public export 
-getKeyState: GlfwWindow -> FunctionKey -> KeyEventTy
-getKeyState win key = (state (glfwGetFunctionKey win key)) where
+getFunctionKeyState: GlfwWindow -> FunctionKey -> KeyEventTy
+getFunctionKeyState win key = (state (glfwGetFunctionKey win key)) where
+    state: IO KeyEventTy -> KeyEventTy
+    state keystate = unsafePerformIO keystate
+
+public export
+getKeyState: GlfwWindow -> Char -> KeyEventTy
+getKeyState win key = (state (glfwGetKey win key)) where
     state: IO KeyEventTy -> KeyEventTy
     state keystate = unsafePerformIO keystate
 
 public export
 worldYPosToScreenYPos: Double -> Double
 worldYPosToScreenYPos y = (y - HALF_DIMY) / HALF_DIMY
+
+public export
+worldXPosToScreenXPos: Double -> Double
+worldXPosToScreenXPos x = (x - HALF_DIMX) / HALF_DIMX
 
 -- https://www.youtube.com/watch?v=6LJExJ7vpYg
 public export
@@ -143,7 +157,7 @@ getPlayer2Transform (MkPongState _ _ _ _ h) = translate [P2_XPOSITION, worldYPos
 
 public export
 getPuckTransform: PongState -> TransformationMatrix
-getPuckTransform (MkPongState _ (x, y) _ _ _) = translate [x, y, 1.0]
+getPuckTransform (MkPongState _ (x, y) _ _ _) = translate [worldXPosToScreenXPos x, worldYPosToScreenYPos y, 0]
 
 public export
 movePlayerUp: Double -> Double
@@ -160,16 +174,27 @@ movePlayerDown height = if height <= MIN_Y_VALUE
 public export
 gameLoop: GlfwWindow -> PongState -> PongState
 gameLoop win pongState@(MkPongState (p1_score, p2_score) (puckx, pucky) vel p1_height p2_height) = do
-    let up_key = getKeyState win GLFW_KEY_UP
-    let down_key = getKeyState win GLFW_KEY_DOWN
+    let up_key = getFunctionKeyState win GLFW_KEY_UP
+    let down_key = getFunctionKeyState win GLFW_KEY_DOWN
+
+    let w_key = getKeyState win 'w'
+    let s_key = getKeyState win 's'
+
     let new_puck_pos = updatePuckPos DT (puckx, pucky) vel
     let new_puck_vel = updatePuckVel new_puck_pos vel
     let new_score = updateScore p1_score p2_score new_puck_pos
 
-    -- TODO: How shall we update p2_height?
-    if up_key == GLFW_PRESS
-        then MkPongState new_score new_puck_pos new_puck_vel (movePlayerUp p1_height) (p2_height)
-    else if down_key == GLFW_PRESS
-        then MkPongState new_score new_puck_pos new_puck_vel (movePlayerDown p1_height) (p2_height)
-        else MkPongState new_score new_puck_pos new_puck_vel p1_height p2_height
+    let new_p1_pos = if up_key == GLFW_PRESS
+                         then movePlayerUp p1_height
+                     else if down_key == GLFW_PRESS
+                         then movePlayerDown p1_height
+                         else p1_height
+
+    let new_p2_pos = if w_key == GLFW_PRESS
+                         then movePlayerUp p2_height
+                     else if s_key == GLFW_PRESS
+                         then movePlayerDown p2_height
+                         else p2_height
+
+    MkPongState new_score new_puck_pos new_puck_vel new_p1_pos new_p2_pos
 
