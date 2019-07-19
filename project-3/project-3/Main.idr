@@ -122,22 +122,6 @@ destroyShaders (MkShaders shader1 shader2 program) = do
 elements : List Int
 elements = [ 0, 1, 2, 1, 3, 2 ]
 
-vertices : List (Double, Double, Double, Double)
-vertices = [
-  (0.0, 0.0, 0.0, 1.0),
-  (0.1, 0.0, 0.0, 1.0),
-  (0.0, 0.5, 0.0, 1.0),
-  (0.1, 0.5, 0.0, 1.0)
-  ]
-
-puck_verts : List (Double, Double, Double, Double)
-puck_verts = [
-  (0.0, 0.0, 0.0, 1.0),
-  (0.5, 0.0, 0.0, 1.0),
-  (0.0, 0.5, 0.0, 1.0),
-  (0.5, 0.5, 0.0, 1.0)
-  ]
-
 colors : List (Double, Double, Double, Double)
 colors = [
     (0.9, 0.9, 0.9, 1.0),
@@ -158,19 +142,16 @@ flatten : List (Double, Double, Double, Double) -> List Double
 flatten [] = []
 flatten ((a,b,c,d) :: xs) = [a,b,c,d] ++ (flatten xs)
 
-
-createBuffers : IO Vao
-createBuffers = do
-
+populateVAO : Int -> List (Double, Double, Double, Double) -> IO Vao
+populateVAO vao verts = do
   ds <- sizeofDouble
   glGetError
 
-  (vao :: _) <- glGenVertexArrays 1
   glBindVertexArray vao
 
   (buffer :: elementBuffer :: colorBuffer :: _) <- glGenBuffers 3
 
-  let data1 = (flatten vertices)
+  let data1 = (flatten verts)
   ptr <- doublesToBuffer data1
   glBindBuffer GL_ARRAY_BUFFER buffer
   glBufferData GL_ARRAY_BUFFER  (ds * (cast $ length data1)) ptr GL_STATIC_DRAW
@@ -198,6 +179,11 @@ createBuffers = do
 
   pure $ MkVao vao buffer colorBuffer elementBuffer
 
+createBuffers : IO (Vao, Vao)
+createBuffers = do
+  (vao :: pvao :: _) <- glGenVertexArrays 2
+  MkPair <$> (populateVAO vao vertices) <*> (populateVAO pvao puck_verts)
+
 createUniforms : Int -> IO Uniforms
 createUniforms program = do
   transform <- glGetUniformLocation program "transform"
@@ -221,10 +207,11 @@ destroyBuffers (MkVao vao buffer colorBuffer ebuffer) = do
 
   showError "destroy buffers "
 
-data State = MkState GlfwWindow Vao Shaders Uniforms PongState
+-- Window PaddleVAO PuckVAO Shaders Uniforms GameState
+data State = MkState GlfwWindow Vao Vao Shaders Uniforms PongState
 
 draw : State -> IO ()
-draw (MkState win vao (MkShaders _ _ prog ) (MkUniforms transform) pong) = do
+draw (MkState win vao pvao (MkShaders _ _ prog ) (MkUniforms transform) pong) = do
     glClearColor 0 0 0 1
     glClear GL_COLOR_BUFFER_BIT
     glClear GL_DEPTH_BUFFER_BIT
@@ -242,7 +229,7 @@ draw (MkState win vao (MkShaders _ _ prog ) (MkUniforms transform) pong) = do
 
     -- Draw the Puck
     glUniformMatrix4fv transform 1 GL_TRUE (matrixToList ((getPuckTransform pong)))
-    glBindVertexArray (id vao)
+    glBindVertexArray (id pvao)
     glDrawElements GL_TRIANGLES 6 GL_UNSIGNED_INT prim__null
 
     glfwSwapBuffers win
@@ -270,14 +257,14 @@ initDisplay = do
     pure win
 
 eventLoop : State -> IO ()
-eventLoop state@(MkState win vao shaders uniforms pong) = do
+eventLoop state@(MkState win vao pvao shaders uniforms pong) = do
     draw state
     glfwPollEvents
     key <- glfwGetFunctionKey win GLFW_KEY_ESCAPE
     shouldClose <- glfwWindowShouldClose win
     if shouldClose || key == GLFW_PRESS
         then pure ()
-        else eventLoop (MkState win vao shaders uniforms (gameLoop win pong))
+        else eventLoop (MkState win vao pvao shaders uniforms (gameLoop win pong))
 
 main : IO ()
 main = do
@@ -285,9 +272,9 @@ main = do
     glfwSetInputMode win GLFW_STICKY_KEYS 1
     Right shaders <- createShaders
       | Left err => printLn err
-    vao <- createBuffers
+    (vao, pvao) <- createBuffers
     uniforms <- createUniforms (program shaders)
-    eventLoop( MkState win vao shaders uniforms (MkPongState (0, 0) CENTER DEFAULT_VELOCITY HALF_DIMY HALF_DIMY)) -- TODO
+    eventLoop( MkState win vao pvao shaders uniforms (MkPongState (0, 0) CENTER DEFAULT_VELOCITY HALF_DIMY HALF_DIMY)) -- TODO
     destroyBuffers vao
     destroyShaders shaders
     glfwDestroyWindow win
