@@ -45,8 +45,7 @@ public export
 record PongState where
     constructor MkPongState
     scores : (Integer, Integer)
-    puck_pos : (Double, Double)
-    puck_vel : (Double, Double)
+    puck : Puck
     p1 : GameObject
     p2 : GameObject
 
@@ -108,20 +107,20 @@ DT: Double
 DT = 0.1
 
 public export
-P1_XPOSITION: Double
-P1_XPOSITION = -0.8
-
-public export
-P2_XPOSITION: Double
-P2_XPOSITION = 0.8
-
-public export
 P1_INIT_POSITION: Vect2D
 P1_INIT_POSITION = fromList [-0.8, HALF_DIMY, 0.0, 1.0]
 
 public export
 P2_INIT_POSITION: Vect2D
 P2_INIT_POSITION = fromList [0.8, HALF_DIMY, 0.0, 1.0]
+
+public export
+PUCK_INIT_POSITION: Vect2D
+PUCK_INIT_POSITION = fromList [CENTERX, CENTERY, 0, 1]
+
+public export
+PUCK_INIT_VELOCITY: Vect2D
+PUCK_INIT_VELOCITY = fromList [-2, 0, 0, 0]
 
 public export
 Z_COORDINATE: Double
@@ -167,8 +166,8 @@ makeRectFromVerts [(v1x, v1y, _, _), (v2x, v2y, _, _), (v3x, v3y, _, _), (v4x, v
 makeRectFromVerts Nil = MkRect (0, 0) (0, 0) -- Error Case
 
 public export 
-updateScore: Integer -> Integer -> (Double, Double) -> (Integer, Integer)
-updateScore p1 p2 puck@(x, _) = if x <= 0
+updateScore: Integer -> Integer -> Puck -> (Integer, Integer)
+updateScore p1 p2 puck@(MkPuck (MkGameObject _ (x :: _ :: _ :: _)) _) = if x <= 0
                                    then (p1, p2 + 1)
                                 else if x >= (cast DIMENSIONX)
                                    then (p1 + 1, p2)
@@ -218,15 +217,15 @@ worldXPosToScreenXPos x = (x - HALF_DIMX) / HALF_DIMX
 -- https://www.youtube.com/watch?v=6LJExJ7vpYg
 public export
 getPlayer1Transform: PongState -> TransformationMatrix
-getPlayer1Transform (MkPongState _ _ _ (MkGameObject _ (_ :: h :: _ :: _)) _) = translate [P1_XPOSITION, worldYPosToScreenYPos h, 0]
+getPlayer1Transform (MkPongState _ _ (MkGameObject _ (x :: y :: z :: _)) _) = translate [x, worldYPosToScreenYPos y, z]
 
 public export
 getPlayer2Transform: PongState -> TransformationMatrix
-getPlayer2Transform (MkPongState _ _ _ _ (MkGameObject _ (_ :: h :: _ :: _))) = translate [P2_XPOSITION, worldYPosToScreenYPos h, 0]
+getPlayer2Transform (MkPongState _ _ _ (MkGameObject _ (x :: y :: z :: _))) = translate [x, worldYPosToScreenYPos y, z]
 
 public export
 getPuckTransform: PongState -> TransformationMatrix
-getPuckTransform (MkPongState _ (x, y) _ _ _) = translate [worldXPosToScreenXPos x, worldYPosToScreenYPos y, 0]
+getPuckTransform (MkPongState _ (MkPuck (MkGameObject _ (x :: y :: z :: _)) _) _ _) = translate [worldXPosToScreenXPos x, worldYPosToScreenYPos y, z]
 
 public export
 movePlayerUp: Double -> Double
@@ -241,15 +240,15 @@ movePlayerDown height = if height <= MIN_Y_VALUE
                            else height - MOVE_SPEED
 
 public export
-updatePuck: PongState -> ((Double, Double), (Double, Double))
-updatePuck (MkPongState s (x, y) (i, j) p1 p2) = do
+updatePuck: PongState -> Puck
+updatePuck (MkPongState s (MkPuck (MkGameObject verts (x :: y :: z :: w)) (i :: j :: k :: l)) p1 p2) = do
   let paddle_rect = makeRectFromVerts vertices
   let puck_rect = makeRectFromVerts puck_verts
 
-  let new_pos = updatePuckPos DT (x, y) (i, j)
-  let new_vel = updatePuckVel new_pos (i, j)
+  let (newx, newy) = updatePuckPos DT (x, y) (i, j)
+  let (newi, newj) = updatePuckVel (newx, newy) (i, j)
 
-  (new_pos, new_vel)
+  MkPuck (MkGameObject verts (newx :: newy :: z :: w)) (newi :: newj :: k :: l)
 
 public export
 updatePlayer: GameObject -> (KeyEventTy, KeyEventTy) -> GameObject
@@ -263,19 +262,19 @@ updatePlayer (MkGameObject verts (x :: y :: z :: w)) (up, down) =  do
 
 public export
 gameLoop: GlfwWindow -> PongState -> PongState
-gameLoop win pongState@(MkPongState (p1_score, p2_score) (puckx, pucky) vel p1 p2) = do
+gameLoop win pongState@(MkPongState (p1_score, p2_score) puck p1 p2) = do
     let up_key = getFunctionKeyState win GLFW_KEY_UP
     let down_key = getFunctionKeyState win GLFW_KEY_DOWN
 
     let w_key = getKeyState win 'w'
     let s_key = getKeyState win 's'
 
-    let (new_puck_pos, new_puck_vel) = updatePuck pongState
+    let new_puck = updatePuck pongState
 
-    let new_score = updateScore p1_score p2_score new_puck_pos
+    let new_score = updateScore p1_score p2_score new_puck
 
     let new_p1 = updatePlayer p1 (w_key, s_key)
     let new_p2 = updatePlayer p2 (up_key, down_key)
 
-    MkPongState new_score new_puck_pos new_puck_vel new_p1 new_p2
+    MkPongState new_score new_puck new_p1 new_p2
 
