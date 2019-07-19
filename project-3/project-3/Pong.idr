@@ -7,6 +7,24 @@ import Graphics.Util.Transforms
 import Graphics.Rendering.Gl
 
 public export
+vertices : List (Double, Double, Double, Double)
+vertices = [
+  (0.0, 0.0, 0.0, 1.0),
+  (0.1, 0.0, 0.0, 1.0),
+  (0.0, 0.5, 0.0, 1.0),
+  (0.1, 0.5, 0.0, 1.0)
+  ]
+
+public export
+puck_verts : List (Double, Double, Double, Double)
+puck_verts = [
+  (0.0, 0.0, 0.0, 1.0),
+  (0.05, 0.0, 0.0, 1.0),
+  (0.0, 0.05, 0.0, 1.0),
+  (0.05, 0.05, 0.0, 1.0)
+  ]
+
+public export
 DIMENSIONX:  Int
 DIMENSIONX = 800
 
@@ -86,6 +104,33 @@ MAX_Y_VALUE = (cast DIMENSIONY) - 200
 public export
 MIN_Y_VALUE: Double
 MIN_Y_VALUE = 50
+
+public export
+data Rect = MkRect (Double, Double) (Double, Double)
+
+public export
+isColliding: Rect -> Rect -> Bool
+isColliding (MkRect (minx1, miny1) (maxx1, maxy1)) (MkRect (minx2, miny2) (maxx2, maxy2)) =
+  ((minx1 + (maxx1 - minx1)) >= minx2) && ((minx2 + (maxx2 - minx2)) >= minx1) && ((miny1 + (maxy1 - miny1)) >= miny2) && ((miny2 + (maxy2 - miny2)) >= miny1)
+
+public export
+minDouble: List Double -> Double
+minDouble doubles = helper doubles (negate 20000) where
+  helper : List Double -> Double -> Double
+  helper (d :: rest) smallest = if d < smallest then d else (helper rest smallest)
+  helper Nil smallest = smallest
+
+public export
+maxDouble: List Double -> Double
+maxDouble doubles = helper doubles 20000000 where
+  helper : List Double -> Double -> Double
+  helper (d :: rest) biggest = if d > biggest then d else (helper rest biggest)
+  helper Nil biggest = biggest
+
+public export
+makeRectFromVerts: List (Double, Double, Double, Double) -> Rect
+makeRectFromVerts [(v1x, v1y, _, _), (v2x, v2y, _, _), (v3x, v3y, _, _), (v4x, v4y, _, _)] = MkRect (minDouble [v1x, v2x, v3x, v4x], minDouble [v1y, v2y, v3y, v4y]) (maxDouble [v1x, v2x, v3x, v4x], maxDouble [v1y, v2y, v3y, v4y])
+makeRectFromVerts Nil = MkRect (0, 0) (0, 0) -- Error Case
 
 -- (P1 Score, P2 Score) (PuckX, PuckY) P1Height P2Height
 public export
@@ -172,6 +217,18 @@ movePlayerDown height = if height <= MIN_Y_VALUE
                            else height - MOVE_SPEED
 
 public export
+updatePuck: PongState -> PongState
+updatePuck (MkPongState s (x, y) (i, j) h1 h2) = do
+  let paddle_rect = makeRectFromVerts vertices
+  let puck_rect = makeRectFromVerts puck_verts
+
+  let new_pos = updatePuckPos DT (x, y) (i, j)
+  let new_vel = updatePuckVel new_pos (i, j)
+
+  MkPongState s new_pos new_vel h1 h2
+
+
+public export
 gameLoop: GlfwWindow -> PongState -> PongState
 gameLoop win pongState@(MkPongState (p1_score, p2_score) (puckx, pucky) vel p1_height p2_height) = do
     let up_key = getFunctionKeyState win GLFW_KEY_UP
@@ -180,8 +237,8 @@ gameLoop win pongState@(MkPongState (p1_score, p2_score) (puckx, pucky) vel p1_h
     let w_key = getKeyState win 'w'
     let s_key = getKeyState win 's'
 
-    let new_puck_pos = updatePuckPos DT (puckx, pucky) vel
-    let new_puck_vel = updatePuckVel new_puck_pos vel
+    let (MkPongState _ new_puck_pos new_puck_vel _ _) = updatePuck pongState
+
     let new_score = updateScore p1_score p2_score new_puck_pos
 
     let new_p1_pos = if up_key == GLFW_PRESS
