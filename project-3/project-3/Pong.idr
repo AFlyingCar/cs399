@@ -7,7 +7,15 @@ import Graphics.Util.Transforms
 import Graphics.Rendering.Gl
 
 public export
-vertices : List (Double, Double, Double, Double)
+VertList : Type
+VertList = List (Double, Double, Double, Double)
+
+public export
+Vect2D : Type
+Vect2D = Vect 4 Double
+
+public export
+vertices : VertList
 vertices = [
   (0.0, 0.0, 0.0, 1.0),
   (0.1, 0.0, 0.0, 1.0),
@@ -16,13 +24,31 @@ vertices = [
   ]
 
 public export
-puck_verts : List (Double, Double, Double, Double)
+puck_verts : VertList
 puck_verts = [
   (0.0, 0.0, 0.0, 1.0),
   (0.05, 0.0, 0.0, 1.0),
   (0.0, 0.05, 0.0, 1.0),
   (0.05, 0.05, 0.0, 1.0)
   ]
+
+-- list of vertices, and a position
+public export
+data GameObject = MkGameObject VertList Vect2D
+
+-- same as GO, but also has a velocity
+public export
+data Puck = MkPuck GameObject Vect2D
+
+-- (P1 Score, P2 Score) (PuckX, PuckY) P1Height P2Height
+public export
+record PongState where
+    constructor MkPongState
+    scores : (Integer, Integer)
+    puck_pos : (Double, Double)
+    puck_vel : (Double, Double)
+    p1 : GameObject
+    p2 : GameObject
 
 public export
 DIMENSIONX:  Int
@@ -90,6 +116,14 @@ P2_XPOSITION: Double
 P2_XPOSITION = 0.8
 
 public export
+P1_INIT_POSITION: Vect2D
+P1_INIT_POSITION = fromList [-0.8, HALF_DIMY, 0.0, 1.0]
+
+public export
+P2_INIT_POSITION: Vect2D
+P2_INIT_POSITION = fromList [0.8, HALF_DIMY, 0.0, 1.0]
+
+public export
 Z_COORDINATE: Double
 Z_COORDINATE = 0
 
@@ -131,16 +165,6 @@ public export
 makeRectFromVerts: List (Double, Double, Double, Double) -> Rect
 makeRectFromVerts [(v1x, v1y, _, _), (v2x, v2y, _, _), (v3x, v3y, _, _), (v4x, v4y, _, _)] = MkRect (minDouble [v1x, v2x, v3x, v4x], minDouble [v1y, v2y, v3y, v4y]) (maxDouble [v1x, v2x, v3x, v4x], maxDouble [v1y, v2y, v3y, v4y])
 makeRectFromVerts Nil = MkRect (0, 0) (0, 0) -- Error Case
-
--- (P1 Score, P2 Score) (PuckX, PuckY) P1Height P2Height
-public export
-record PongState where
-    constructor MkPongState
-    scores : (Integer, Integer)
-    puck_pos : (Double, Double)
-    puck_vel : (Double, Double)
-    p1_height : Double
-    p2_height : Double
 
 public export 
 updateScore: Integer -> Integer -> (Double, Double) -> (Integer, Integer)
@@ -194,11 +218,11 @@ worldXPosToScreenXPos x = (x - HALF_DIMX) / HALF_DIMX
 -- https://www.youtube.com/watch?v=6LJExJ7vpYg
 public export
 getPlayer1Transform: PongState -> TransformationMatrix
-getPlayer1Transform (MkPongState _ _ _ h _) = translate [P1_XPOSITION, worldYPosToScreenYPos h, 0]
+getPlayer1Transform (MkPongState _ _ _ (MkGameObject _ (_ :: h :: _ :: _)) _) = translate [P1_XPOSITION, worldYPosToScreenYPos h, 0]
 
 public export
 getPlayer2Transform: PongState -> TransformationMatrix
-getPlayer2Transform (MkPongState _ _ _ _ h) = translate [P2_XPOSITION, worldYPosToScreenYPos h, 0]
+getPlayer2Transform (MkPongState _ _ _ _ (MkGameObject _ (_ :: h :: _ :: _))) = translate [P2_XPOSITION, worldYPosToScreenYPos h, 0]
 
 public export
 getPuckTransform: PongState -> TransformationMatrix
@@ -217,41 +241,41 @@ movePlayerDown height = if height <= MIN_Y_VALUE
                            else height - MOVE_SPEED
 
 public export
-updatePuck: PongState -> PongState
-updatePuck (MkPongState s (x, y) (i, j) h1 h2) = do
+updatePuck: PongState -> ((Double, Double), (Double, Double))
+updatePuck (MkPongState s (x, y) (i, j) p1 p2) = do
   let paddle_rect = makeRectFromVerts vertices
   let puck_rect = makeRectFromVerts puck_verts
 
   let new_pos = updatePuckPos DT (x, y) (i, j)
   let new_vel = updatePuckVel new_pos (i, j)
 
-  MkPongState s new_pos new_vel h1 h2
+  (new_pos, new_vel)
 
+public export
+updatePlayer: GameObject -> (KeyEventTy, KeyEventTy) -> GameObject
+updatePlayer (MkGameObject verts (x :: y :: z :: w)) (up, down) =  do
+  let new_y = if up == GLFW_PRESS
+                then movePlayerUp y
+              else if down == GLFW_PRESS
+                then movePlayerDown y
+                else y
+  MkGameObject verts (x :: new_y :: z :: w)
 
 public export
 gameLoop: GlfwWindow -> PongState -> PongState
-gameLoop win pongState@(MkPongState (p1_score, p2_score) (puckx, pucky) vel p1_height p2_height) = do
+gameLoop win pongState@(MkPongState (p1_score, p2_score) (puckx, pucky) vel p1 p2) = do
     let up_key = getFunctionKeyState win GLFW_KEY_UP
     let down_key = getFunctionKeyState win GLFW_KEY_DOWN
 
     let w_key = getKeyState win 'w'
     let s_key = getKeyState win 's'
 
-    let (MkPongState _ new_puck_pos new_puck_vel _ _) = updatePuck pongState
+    let (new_puck_pos, new_puck_vel) = updatePuck pongState
 
     let new_score = updateScore p1_score p2_score new_puck_pos
 
-    let new_p1_pos = if up_key == GLFW_PRESS
-                         then movePlayerUp p1_height
-                     else if down_key == GLFW_PRESS
-                         then movePlayerDown p1_height
-                         else p1_height
+    let new_p1 = updatePlayer p1 (w_key, s_key)
+    let new_p2 = updatePlayer p2 (up_key, down_key)
 
-    let new_p2_pos = if w_key == GLFW_PRESS
-                         then movePlayerUp p2_height
-                     else if s_key == GLFW_PRESS
-                         then movePlayerDown p2_height
-                         else p2_height
-
-    MkPongState new_score new_puck_pos new_puck_vel new_p1_pos new_p2_pos
+    MkPongState new_score new_puck_pos new_puck_vel new_p1 new_p2
 
