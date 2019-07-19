@@ -274,7 +274,9 @@ main = do
       | Left err => printLn err
     (vao, pvao) <- createBuffers
     uniforms <- createUniforms (program shaders)
-    eventLoop( MkState win vao pvao shaders uniforms (MkPongState (0, 0) CENTER DEFAULT_VELOCITY HALF_DIMY HALF_DIMY)) -- TODO
+    paddle1 <- pure $ MkGameObject vertices P1_INIT_POSITION
+    paddle2 <- pure $ MkGameObject vertices P2_INIT_POSITION
+    eventLoop( MkState win vao pvao shaders uniforms (MkPongState (0, 0) CENTER DEFAULT_VELOCITY paddle1 paddle2)) -- TODO
     destroyBuffers vao
     destroyShaders shaders
     glfwDestroyWindow win
