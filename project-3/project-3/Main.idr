@@ -19,21 +19,6 @@ import Pong
 %include C "GL/glew.h"
 %flag C "-lGLEW -lGL -lglfw"
 
-projection : TransformationMatrix
-projection = perspectiveProjection (Radians 45) (800.0 / 600.0) (0.1, 10)
--- projection = orthographicProjection (0, 800) (0, 600) (NEARPLANE, FARPLANE)
-
-public export
-matrixToList: (Vect n (Vect m Double)) -> List Double
-matrixToList Nil = []
-matrixToList matrix = reverse (accumMatrixValues matrix []) where
-    accumMatrixValues: (Vect n (Vect m Double)) -> List Double -> List Double
-    accumMatrixValues Nil values = values
-    accumMatrixValues (row :: rest) values = accumMatrixValues rest (accumRowValues row values) where
-        accumRowValues: (Vect m Double) -> List Double -> List Double
-        accumRowValues Nil values = values
-        accumRowValues (val :: rest) values = accumRowValues rest (val :: values)
-
 errToStr : GLenum -> String
 errToStr err = case err of
                     0 => "OK"
@@ -218,17 +203,17 @@ draw (MkState win vao pvao (MkShaders _ _ prog ) (MkUniforms transform) pong) = 
     glUseProgram prog
 
     -- Draw Player1
-    glUniformMatrix4fv transform 1 GL_TRUE (matrixToList ((getPlayer1Transform pong)))
+    glUniformMatrix4fv transform 1 GL_FALSE (toList (toGl ((getPlayer1Transform pong))))
     glBindVertexArray (id vao)
     glDrawElements GL_TRIANGLES 6 GL_UNSIGNED_INT prim__null
 
     -- Draw Player2
-    glUniformMatrix4fv transform 1 GL_TRUE (matrixToList ((getPlayer2Transform pong)))
+    glUniformMatrix4fv transform 1 GL_FALSE (toList (toGl ((getPlayer2Transform pong))))
     glBindVertexArray (id vao)
     glDrawElements GL_TRIANGLES 6 GL_UNSIGNED_INT prim__null
 
     -- Draw the Puck
-    glUniformMatrix4fv transform 1 GL_TRUE (matrixToList ((getPuckTransform pong)))
+    glUniformMatrix4fv transform 1 GL_FALSE (toList (toGl ((getPuckTransform pong))))
     glBindVertexArray (id pvao)
     glDrawElements GL_TRIANGLES 6 GL_UNSIGNED_INT prim__null
 
