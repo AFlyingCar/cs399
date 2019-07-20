@@ -1,6 +1,9 @@
 module Pong
 
+import Debug.Trace
+
 import Data.Vect
+import Data.Matrix
 
 import Graphics.Util.Glfw
 import Graphics.Util.Transforms
@@ -55,7 +58,7 @@ DIMENSIONX = 800
 
 public export
 DIMENSIONY:  Int
-DIMENSIONY = 600 
+DIMENSIONY = 600
 
 public export
 HALF_DIMX: Double
@@ -69,17 +72,13 @@ public export
 DIMENSIONS:  (Int, Int)
 DIMENSIONS = (DIMENSIONX, DIMENSIONY)
 
-public export 
+public export
 FOV: Angle
 FOV = Degree 45.0
 
 public export
 ASPECT: Double
 ASPECT = (cast DIMENSIONX) / (cast DIMENSIONY)
-
-public export 
-NEARPLANE: Double
-NEARPLANE = 0.1
 
 public export
 FARPLANE: Double
@@ -163,9 +162,15 @@ maxDouble doubles = helper doubles 20000000 where
 public export
 makeRectFromVerts: List (Double, Double, Double, Double) -> Rect
 makeRectFromVerts [(v1x, v1y, _, _), (v2x, v2y, _, _), (v3x, v3y, _, _), (v4x, v4y, _, _)] = MkRect (minDouble [v1x, v2x, v3x, v4x], minDouble [v1y, v2y, v3y, v4y]) (maxDouble [v1x, v2x, v3x, v4x], maxDouble [v1y, v2y, v3y, v4y])
-makeRectFromVerts Nil = MkRect (0, 0) (0, 0) -- Error Case
+makeRectFromVerts Nil = ?nilListCannotBeMadeIntoARect
 
-public export 
+public export
+transformRect: Rect -> TransformationMatrix -> Rect
+transformRect (MkRect (minx, miny) (maxx, maxy)) trans = MkRect (v2p (vmult trans (minx :: miny :: 0 :: 1 :: Nil))) (v2p (vmult trans (maxx :: maxy :: 0 :: 1 :: Nil))) where
+  v2p : Vect 4 Double -> (Double, Double)
+  v2p (x :: y :: _ :: _) = (x, y)
+
+public export
 updateScore: Integer -> Integer -> Puck -> (Integer, Integer)
 updateScore p1 p2 puck@(MkPuck (MkGameObject _ (x :: _ :: _ :: _)) _) = if x <= 0
                                    then (p1, p2 + 1)
@@ -174,7 +179,7 @@ updateScore p1 p2 puck@(MkPuck (MkGameObject _ (x :: _ :: _ :: _)) _) = if x <= 
                                    else (p1, p2)
 
 -- Make sure that we "bounce" on the top and bottom of the screen, and reset at the edges
-public export 
+public export
 updatePuckPos: Double -> (Double, Double) -> (Double, Double) -> (Double, Double)
 updatePuckPos dt old_pos@(x,y) vel@(i, j) = if (x <= 0) || (x >= (cast DIMENSIONX))
                                                 then CENTER
@@ -186,7 +191,7 @@ updatePuckPos dt old_pos@(x,y) vel@(i, j) = if (x <= 0) || (x >= (cast DIMENSION
 --  colliding with a puck
 -- When we collide with the top or bottom of the screen, invert the y-velocity
 --  to simulate a "bouncing" effect
-public export 
+public export
 updatePuckVel: (Double, Double) -> (Double, Double) -> (Double, Double)
 updatePuckVel pos@(x,y) old_vel@(i, j) = if (x <= 0) || (x >= (cast DIMENSIONX))
                                             then DEFAULT_VELOCITY
@@ -194,7 +199,7 @@ updatePuckVel pos@(x,y) old_vel@(i, j) = if (x <= 0) || (x >= (cast DIMENSIONX))
                                                 then (i, -j)
                                                 else (i, j)
 
-public export 
+public export
 getFunctionKeyState: GlfwWindow -> FunctionKey -> KeyEventTy
 getFunctionKeyState win key = (state (glfwGetFunctionKey win key)) where
     state: IO KeyEventTy -> KeyEventTy
@@ -241,9 +246,13 @@ movePlayerDown height = if height <= MIN_Y_VALUE
 
 public export
 updatePuck: PongState -> Puck
-updatePuck (MkPongState s (MkPuck (MkGameObject verts (x :: y :: z :: w)) (i :: j :: k :: l)) p1 p2) = do
-  let paddle_rect = makeRectFromVerts vertices
-  let puck_rect = makeRectFromVerts puck_verts
+updatePuck state@(MkPongState s (MkPuck (MkGameObject verts (x :: y :: z :: w)) (i :: j :: k :: l)) p1 p2) = do
+  let paddle1_rect = transformRect (makeRectFromVerts vertices) (getPlayer1Transform state)
+  let paddle2_rect = transformRect (makeRectFromVerts vertices) (getPlayer2Transform state)
+  let puck_rect = transformRect (makeRectFromVerts puck_verts) (getPuckTransform state)
+
+  let col1 = isColliding puck_rect paddle1_rect
+  let col2 = isColliding puck_rect paddle2_rect
 
   let (newx, newy) = updatePuckPos DT (x, y) (i, j)
   let (newi, newj) = updatePuckVel (newx, newy) (i, j)
