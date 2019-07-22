@@ -189,17 +189,48 @@ updatePuckPos dt old_pos@(x,y) vel@(i, j) = if (x <= 0) || (x >= (cast DIMENSION
                                                     then (x + (i * dt), y)
                                                     else (x + (i * dt), y + (j * dt))
 
+public export
+rectCenter: Rect -> (Double, Double)
+rectCenter (MkRect (x1, y1) (x2, y2)) = (((x2 - x1) / 2) + x1, ((y2 - y1) / 2) + y1)
+
+public export
+MAX_ANGLE: Double
+MAX_ANGLE = (5*pi) / 12 -- 75 degrees as radians
+
+public export
+MIN_VEL_Y: Double
+MIN_VEL_Y = 0.1
+
+public export
+MIN_VEL_X: Double
+MIN_VEL_X = 0.1
+
+public export
+calcBounce: Rect -> (Double, Double) -> (Double, Double)
+calcBounce p@(MkRect (_, y1) (_, y2)) (_, y) = let half_height = (y2 - y1) / 2
+                                                   (_, centery) = rectCenter p
+                                                   percentage_from_center = (y - y2) / (centery - y2)
+                                                   angle = MAX_ANGLE * percentage_from_center
+                                               in
+                                                 createBounceVec (cos angle, sin angle) DEFAULT_VELOCITY where
+    createBounceVec: (Double, Double) -> (Double, Double) -> (Double, Double)
+    createBounceVec (c, s) (x, y) = (x * c, y * (negate s))
+
 -- Note: we don't actually need DT here, since velocity is constant unless
 --  colliding with a puck
 -- When we collide with the top or bottom of the screen, invert the y-velocity
 --  to simulate a "bouncing" effect
 public export
-updatePuckVel: (Double, Double) -> (Double, Double) -> (Double, Double)
-updatePuckVel pos@(x,y) old_vel@(i, j) = if (x <= 0) || (x >= (cast DIMENSIONX))
-                                            then DEFAULT_VELOCITY
-                                            else if (y <= 0) || (y >= (cast DIMENSIONY))
-                                                then (i, -j)
-                                                else (i, j)
+updatePuckVel: (Double, Double) -> (Double, Double) -> (Bool, Bool) -> (Rect, Rect) -> (Double, Double)
+updatePuckVel pos@(x,y) (i, j) (c1, c2) (p1, p2) = if (x <= 0) || (x >= (cast DIMENSIONX))
+                                                     then DEFAULT_VELOCITY
+                                                     else if (y <= 0) || (y >= (cast DIMENSIONY)) -- Bounce against top
+                                                       then (i, -j)
+                                                       else if c1
+                                                         then calcBounce p1 pos
+                                                         else if c2
+                                                           then calcBounce p2 pos
+                                                           else (i, j)
 
 public export
 getFunctionKeyState: GlfwWindow -> FunctionKey -> KeyEventTy
@@ -256,8 +287,12 @@ updatePuck state@(MkPongState s (MkPuck (MkGameObject verts (x :: y :: z :: w)) 
   let col1 = isColliding puck_rect paddle1_rect
   let col2 = isColliding puck_rect paddle2_rect
 
-  let (newx, newy) = updatePuckPos DT (x, y) (i, j)
-  let (newi, newj) = updatePuckVel (newx, newy) (i, j)
+  let colliding = col1 || col2
+
+  let (newx, newy) = if colliding
+                        then updatePuckPos DT (x, y) (-i, -j)
+                        else updatePuckPos DT (x, y) (i, j)
+  let (newi, newj) = updatePuckVel (newx, newy) (i, j) (col1, col2) (paddle1_rect, paddle2_rect)
 
   -- let (MkRect (x1, y1) (x2, y2)) = paddle1_rect
   -- ("(" ++ (show x1) ++ ", " ++ (show y1) ++ ") -> (" ++ (show x2) ++ "," ++ (show y2) ++ ")")
