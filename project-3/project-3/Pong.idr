@@ -140,23 +140,25 @@ MIN_Y_VALUE = 50
 public export
 data Rect = MkRect (Double, Double) (Double, Double)
 
+-- https://martin-thoma.com/how-to-check-if-two-line-segments-intersect/
 public export
 isColliding: Rect -> Rect -> Bool
-isColliding (MkRect (minx1, miny1) (maxx1, maxy1)) (MkRect (minx2, miny2) (maxx2, maxy2)) =
-  ((minx1 + (maxx1 - minx1)) >= minx2) && ((minx2 + (maxx2 - minx2)) >= minx1) && ((miny1 + (maxy1 - miny1)) >= miny2) && ((miny2 + (maxy2 - miny2)) >= miny1)
+isColliding (MkRect (ax1, ay1) (ax2, ay2)) (MkRect (bx1, by1) (bx2, by2)) =
+  (ax1 <= bx2) && (ax2 >= bx1) && (ay1 <= by2) && (ay2 >= by1)
+--   ((minx1 + (maxx1 - minx1)) >= minx2) && ((minx2 + (maxx2 - minx2)) >= minx1) && ((miny1 + (maxy1 - miny1)) >= miny2) && ((miny2 + (maxy2 - miny2)) >= miny1)
 
 public export
 minDouble: List Double -> Double
-minDouble doubles = helper doubles (negate 20000) where
+minDouble doubles = helper doubles 20000 where
   helper : List Double -> Double -> Double
-  helper (d :: rest) smallest = if d < smallest then d else (helper rest smallest)
+  helper (d :: rest) smallest = if d < smallest then (helper rest d) else (helper rest smallest)
   helper Nil smallest = smallest
 
 public export
 maxDouble: List Double -> Double
-maxDouble doubles = helper doubles 20000000 where
+maxDouble doubles = helper doubles (negate 20000) where
   helper : List Double -> Double -> Double
-  helper (d :: rest) biggest = if d > biggest then d else (helper rest biggest)
+  helper (d :: rest) biggest = if d > biggest then (helper rest d) else (helper rest biggest)
   helper Nil biggest = biggest
 
 public export
@@ -256,6 +258,10 @@ updatePuck state@(MkPongState s (MkPuck (MkGameObject verts (x :: y :: z :: w)) 
 
   let (newx, newy) = updatePuckPos DT (x, y) (i, j)
   let (newi, newj) = updatePuckVel (newx, newy) (i, j)
+
+  -- let (MkRect (x1, y1) (x2, y2)) = paddle1_rect
+  -- ("(" ++ (show x1) ++ ", " ++ (show y1) ++ ") -> (" ++ (show x2) ++ "," ++ (show y2) ++ ")")
+  -- trace (show col1) (MkPuck (MkGameObject verts (newx :: newy :: z :: w)) (newi :: newj :: k :: l))
 
   MkPuck (MkGameObject verts (newx :: newy :: z :: w)) (newi :: newj :: k :: l)
 
