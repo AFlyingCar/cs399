@@ -11,6 +11,7 @@ import Graphics.Rendering.Config
 
 -- Vect
 import Data.Vect
+import Data.Matrix
 -- translate
 import Graphics.Util.Transforms
 
@@ -18,6 +19,17 @@ import Pong
 
 %include C "GL/glew.h"
 %flag C "-lGLEW -lGL -lglfw"
+
+split_verts : VertList
+split_verts = [
+  (0.0, 0.0, 0.0, 1.0),
+  (0.05, 0.0, 0.0, 1.0),
+  (0.0, 1, 0.0, 1.0),
+  (0.05, 1, 0.0, 1.0)
+  ]
+
+-- line_transform: TransformationMatrix
+-- line_transform = 
 
 errToStr : GLenum -> String
 errToStr err = case err of
@@ -164,10 +176,12 @@ populateVAO vao verts = do
 
   pure $ MkVao vao buffer colorBuffer elementBuffer
 
-createBuffers : IO (Vao, Vao)
+data TripleVao = MkTriple Vao Vao Vao
+
+createBuffers : IO TripleVao
 createBuffers = do
-  (vao :: pvao :: _) <- glGenVertexArrays 2
-  MkPair <$> (populateVAO vao vertices) <*> (populateVAO pvao puck_verts)
+  (vao :: pvao :: svao :: _) <- glGenVertexArrays 3
+  MkTriple <$> (populateVAO vao vertices) <*> (populateVAO pvao puck_verts) <*> (populateVAO svao split_verts)
 
 createUniforms : Int -> IO Uniforms
 createUniforms program = do
@@ -193,29 +207,34 @@ destroyBuffers (MkVao vao buffer colorBuffer ebuffer) = do
   showError "destroy buffers "
 
 -- Window PaddleVAO PuckVAO Shaders Uniforms GameState
-data State = MkState GlfwWindow Vao Vao Shaders Uniforms PongState
+data State = MkState GlfwWindow Vao Vao Vao Shaders Uniforms PongState
 
 draw : State -> IO ()
-draw (MkState win vao pvao (MkShaders _ _ prog ) (MkUniforms transform) pong) = do
+draw (MkState win vao pvao svao (MkShaders _ _ prog ) (MkUniforms transform) pong) = do
     glClearColor 0 0 0 1
     glClear GL_COLOR_BUFFER_BIT
     glClear GL_DEPTH_BUFFER_BIT
     glUseProgram prog
 
     -- Draw Player1
-    glUniformMatrix4fv transform 1 GL_FALSE (toList (toGl ((getPlayer1Transform pong))))
+    glUniformMatrix4fv transform 1 GL_FALSE (toList (toGl (getPlayer1Transform pong)))
     glBindVertexArray (id vao)
     glDrawElements GL_TRIANGLES 6 GL_UNSIGNED_INT prim__null
 
     -- Draw Player2
-    glUniformMatrix4fv transform 1 GL_FALSE (toList (toGl ((getPlayer2Transform pong))))
+    glUniformMatrix4fv transform 1 GL_FALSE (toList (toGl (getPlayer2Transform pong)))
     glBindVertexArray (id vao)
     glDrawElements GL_TRIANGLES 6 GL_UNSIGNED_INT prim__null
 
     -- Draw the Puck
-    glUniformMatrix4fv transform 1 GL_FALSE (toList (toGl ((getPuckTransform pong))))
+    glUniformMatrix4fv transform 1 GL_FALSE (toList (toGl (getPuckTransform pong)))
     glBindVertexArray (id pvao)
     glDrawElements GL_TRIANGLES 6 GL_UNSIGNED_INT prim__null
+
+    -- Draw the line splitting the center of the screen
+    -- glUniformMatrix4fv transform 1 GL_FALSE (toList (toGl (translate [0.5, 0.0, 0.0, 1.0])))
+    -- glBindVertexArray (id svao)
+    -- glDrawElements GL_TRIANGLES 6 GL_UNSIGNED_INT prim__null
 
     glfwSwapBuffers win
 
@@ -241,15 +260,18 @@ initDisplay = do
     putStrLn info
     pure win
 
+scoresToString: PongState -> String
+scoresToString (MkPongState (p1_score, p2_score) puck p1 p2) = "Player 1 -- " ++ (show p1_score) ++ "\nPlayer 2 -- " ++ (show p2_score) ++ "\nThanks for playing!"
+
 eventLoop : State -> IO ()
-eventLoop state@(MkState win vao pvao shaders uniforms pong) = do
+eventLoop state@(MkState win vao pvao svao shaders uniforms pong) = do
     draw state
     glfwPollEvents
     key <- glfwGetFunctionKey win GLFW_KEY_ESCAPE
     shouldClose <- glfwWindowShouldClose win
     if shouldClose || key == GLFW_PRESS
-        then pure ()
-        else eventLoop (MkState win vao pvao shaders uniforms (gameLoop win pong))
+        then putStrLn (scoresToString pong)
+        else eventLoop (MkState win vao pvao svao shaders uniforms (gameLoop win pong))
 
 main : IO ()
 main = do
@@ -257,12 +279,12 @@ main = do
     glfwSetInputMode win GLFW_STICKY_KEYS 1
     Right shaders <- createShaders
       | Left err => printLn err
-    (vao, pvao) <- createBuffers
+    (MkTriple vao pvao svao) <- createBuffers
     uniforms <- createUniforms (program shaders)
     paddle1 <- pure $ MkGameObject vertices P1_INIT_POSITION
     paddle2 <- pure $ MkGameObject vertices P2_INIT_POSITION
     puck <- pure $ MkPuck (MkGameObject puck_verts PUCK_INIT_POSITION) PUCK_INIT_VELOCITY
-    eventLoop( MkState win vao pvao shaders uniforms (MkPongState (0, 0) puck paddle1 paddle2)) -- TODO
+    eventLoop( MkState win vao pvao svao shaders uniforms (MkPongState (0, 0) puck paddle1 paddle2)) -- TODO
     destroyBuffers vao
     destroyShaders shaders
     glfwDestroyWindow win
