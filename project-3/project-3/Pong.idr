@@ -21,9 +21,9 @@ public export
 vertices : VertList
 vertices = [
   (0.0, 0.0, 0.0, 1.0),
-  (0.1, 0.0, 0.0, 1.0),
-  (0.0, 0.5, 0.0, 1.0),
-  (0.1, 0.5, 0.0, 1.0)
+  (0.05, 0.0, 0.0, 1.0),
+  (0.0, 0.4, 0.0, 1.0),
+  (0.05, 0.4, 0.0, 1.0)
   ]
 
 public export
@@ -98,7 +98,7 @@ CENTER = (CENTERX, CENTERY)
 
 public export
 DEFAULT_VELOCITY: (Double, Double)
-DEFAULT_VELOCITY = (-2, 0)
+DEFAULT_VELOCITY = (-1, 1)
 
 -- TODO: Should this be hardcoded??
 public export
@@ -119,7 +119,7 @@ PUCK_INIT_POSITION = fromList [CENTERX, CENTERY, 0, 1]
 
 public export
 PUCK_INIT_VELOCITY: Vect2D
-PUCK_INIT_VELOCITY = fromList [-2, 0, 0, 0]
+PUCK_INIT_VELOCITY = fromList [-1, 1, 0, 0]
 
 public export
 Z_COORDINATE: Double
@@ -127,7 +127,7 @@ Z_COORDINATE = 0
 
 public export
 MOVE_SPEED: Double
-MOVE_SPEED = 1
+MOVE_SPEED = 0.5
 
 public export
 MAX_Y_VALUE: Double
@@ -206,15 +206,19 @@ MIN_VEL_X: Double
 MIN_VEL_X = 0.1
 
 public export
+getRectHeight: Rect -> Double
+getRectHeight (MkRect (_, y1) (_, y2)) = y2 - y1
+
+public export
 calcBounce: Rect -> (Double, Double) -> (Double, Double)
 calcBounce p@(MkRect (_, y1) (_, y2)) (_, y) = let half_height = (y2 - y1) / 2
                                                    (_, centery) = rectCenter p
                                                    percentage_from_center = (y - y2) / (centery - y2)
                                                    angle = MAX_ANGLE * percentage_from_center
                                                in
-                                                 createBounceVec (cos angle, sin angle) DEFAULT_VELOCITY where
-    createBounceVec: (Double, Double) -> (Double, Double) -> (Double, Double)
-    createBounceVec (c, s) (x, y) = (x * c, y * (negate s))
+                                                 createBounceVec (cos angle, sin angle) DEFAULT_VELOCITY percentage_from_center where
+    createBounceVec: (Double, Double) -> (Double, Double) -> Double -> (Double, Double)
+    createBounceVec (c, s) (x, y) p = ((x + x * p) * c, (y + y * p) * (negate s))
 
 -- Note: we don't actually need DT here, since velocity is constant unless
 --  colliding with a puck
@@ -224,12 +228,12 @@ public export
 updatePuckVel: (Double, Double) -> (Double, Double) -> (Bool, Bool) -> (Rect, Rect) -> (Double, Double)
 updatePuckVel pos@(x,y) (i, j) (c1, c2) (p1, p2) = if (x <= 0) || (x >= (cast DIMENSIONX))
                                                      then DEFAULT_VELOCITY
-                                                     else if (y <= 0) || (y >= (cast DIMENSIONY)) -- Bounce against top
+                                                     else if (y <= MIN_Y_VALUE) || (y >= MAX_Y_VALUE - (getRectHeight p1)) -- Bounce against top and bottom
                                                        then (i, -j)
                                                        else if c1
-                                                         then calcBounce p1 pos
+                                                         then (-i, j) -- calcBounce p1 pos
                                                          else if c2
-                                                           then calcBounce p2 pos
+                                                           then (-i, j) -- calcBounce p2 pos
                                                            else (i, j)
 
 public export
