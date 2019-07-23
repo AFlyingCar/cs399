@@ -1,7 +1,5 @@
 module Pong
 
-import Debug.Trace
-
 import Data.Vect
 import Data.Matrix
 
@@ -297,10 +295,6 @@ updatePuck state@(MkPongState s (MkPuck (MkGameObject verts (x :: y :: z :: w)) 
                         then updatePuckPos DT (x, y) (-i, -j)
                         else updatePuckPos DT (x, y) (i, j)
   let (newi, newj) = updatePuckVel (newx, newy) (i, j) (col1, col2) (paddle1_rect, paddle2_rect)
-
-  -- let (MkRect (x1, y1) (x2, y2)) = paddle1_rect
-  -- ("(" ++ (show x1) ++ ", " ++ (show y1) ++ ") -> (" ++ (show x2) ++ "," ++ (show y2) ++ ")")
-  -- trace (show col1) (MkPuck (MkGameObject verts (newx :: newy :: z :: w)) (newi :: newj :: k :: l))
 
   MkPuck (MkGameObject verts (newx :: newy :: z :: w)) (newi :: newj :: k :: l)
 
