@@ -245,6 +245,10 @@ getPuckTransform: PongState -> TransformationMatrix
 getPuckTransform (MkPongState _ (MkPuck (MkGameObject _ (x :: y :: z :: _)) _) _ _) = translate [worldXPosToScreenXPos x, worldYPosToScreenYPos y, z]
 
 public export
+getScores: PongState -> (Integer, Integer)
+getScores (MkPongState scores _ _ _) = scores
+
+public export
 movePlayerUp: Double -> Double
 movePlayerUp height = if height >= MAX_Y_VALUE
                           then height
