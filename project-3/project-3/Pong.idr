@@ -160,6 +160,10 @@ maxDouble doubles = helper doubles (negate 20000) where
   helper Nil biggest = biggest
 
 public export
+getRectHeight: Rect -> Double
+getRectHeight (MkRect (_, y1) (_, y2)) = y2 - y1
+
+public export
 makeRectFromVerts: List (Double, Double, Double, Double) -> Rect
 makeRectFromVerts [(v1x, v1y, _, _), (v2x, v2y, _, _), (v3x, v3y, _, _), (v4x, v4y, _, _)] = MkRect (minDouble [v1x, v2x, v3x, v4x], minDouble [v1y, v2y, v3y, v4y]) (maxDouble [v1x, v2x, v3x, v4x], maxDouble [v1y, v2y, v3y, v4y])
 makeRectFromVerts Nil = ?nilListCannotBeMadeIntoARect
@@ -191,33 +195,6 @@ public export
 rectCenter: Rect -> (Double, Double)
 rectCenter (MkRect (x1, y1) (x2, y2)) = (((x2 - x1) / 2) + x1, ((y2 - y1) / 2) + y1)
 
-public export
-MAX_ANGLE: Double
-MAX_ANGLE = (5*pi) / 12 -- 75 degrees as radians
-
-public export
-MIN_VEL_Y: Double
-MIN_VEL_Y = 0.1
-
-public export
-MIN_VEL_X: Double
-MIN_VEL_X = 0.1
-
-public export
-getRectHeight: Rect -> Double
-getRectHeight (MkRect (_, y1) (_, y2)) = y2 - y1
-
-public export
-calcBounce: Rect -> (Double, Double) -> (Double, Double)
-calcBounce p@(MkRect (_, y1) (_, y2)) (_, y) = let half_height = (y2 - y1) / 2
-                                                   (_, centery) = rectCenter p
-                                                   percentage_from_center = (y - y2) / (centery - y2)
-                                                   angle = MAX_ANGLE * percentage_from_center
-                                               in
-                                                 createBounceVec (cos angle, sin angle) DEFAULT_VELOCITY percentage_from_center where
-    createBounceVec: (Double, Double) -> (Double, Double) -> Double -> (Double, Double)
-    createBounceVec (c, s) (x, y) p = ((x + x * p) * c, (y + y * p) * (negate s))
-
 -- Note: we don't actually need DT here, since velocity is constant unless
 --  colliding with a puck
 -- When we collide with the top or bottom of the screen, invert the y-velocity
@@ -226,12 +203,12 @@ public export
 updatePuckVel: (Double, Double) -> (Double, Double) -> (Bool, Bool) -> (Rect, Rect) -> (Double, Double)
 updatePuckVel pos@(x,y) (i, j) (c1, c2) (p1, p2) = if (x <= 0) || (x >= (cast DIMENSIONX))
                                                      then DEFAULT_VELOCITY
-                                                     else if (y <= MIN_Y_VALUE) || (y >= MAX_Y_VALUE - (getRectHeight p1)) -- Bounce against top and bottom
+                                                     else if (y <= MIN_Y_VALUE) || (y >= MAX_Y_VALUE + 110) -- Bounce against top and bottom
                                                        then (i, -j)
                                                        else if c1
-                                                         then (-i, j) -- calcBounce p1 pos
+                                                         then (-i, j)
                                                          else if c2
-                                                           then (-i, j) -- calcBounce p2 pos
+                                                           then (-i, j)
                                                            else (i, j)
 
 public export
@@ -269,7 +246,7 @@ getPuckTransform (MkPongState _ (MkPuck (MkGameObject _ (x :: y :: z :: _)) _) _
 
 public export
 movePlayerUp: Double -> Double
-movePlayerUp height = if height >= MAX_Y_VALUE -- TODO
+movePlayerUp height = if height >= MAX_Y_VALUE
                           then height
                           else height + MOVE_SPEED
 
