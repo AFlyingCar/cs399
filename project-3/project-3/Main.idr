@@ -284,7 +284,11 @@ main = do
     paddle1 <- pure $ MkGameObject vertices P1_INIT_POSITION
     paddle2 <- pure $ MkGameObject vertices P2_INIT_POSITION
     puck <- pure $ MkPuck (MkGameObject puck_verts PUCK_INIT_POSITION) PUCK_INIT_VELOCITY
+
+    putStrLn "------------------"
     eventLoop( MkState win vao pvao svao shaders uniforms (MkPongState (0, 0) puck paddle1 paddle2)) -- TODO
+    putStrLn "------------------"
+
     destroyBuffers vao
     destroyShaders shaders
     glfwDestroyWindow win
