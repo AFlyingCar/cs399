@@ -16,6 +16,7 @@ import Data.Matrix
 import Graphics.Util.Transforms
 
 import Pong
+import PongTypes
 
 %include C "GL/glew.h"
 %flag C "-lGLEW -lGL -lglfw"

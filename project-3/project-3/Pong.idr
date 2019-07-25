@@ -7,13 +7,7 @@ import Graphics.Util.Glfw
 import Graphics.Util.Transforms
 import Graphics.Rendering.Gl
 
-public export
-VertList : Type
-VertList = List (Double, Double, Double, Double)
-
-public export
-Vect2D : Type
-Vect2D = Vect 4 Double
+import PongTypes
 
 public export
 vertices : VertList
@@ -32,23 +26,6 @@ puck_verts = [
   (0.0, 0.05, 0.0, 1.0),
   (0.05, 0.05, 0.0, 1.0)
   ]
-
--- list of vertices, and a position
-public export
-data GameObject = MkGameObject VertList Vect2D
-
--- same as GO, but also has a velocity
-public export
-data Puck = MkPuck GameObject Vect2D
-
--- (P1 Score, P2 Score) (PuckX, PuckY) P1Height P2Height
-public export
-record PongState where
-    constructor MkPongState
-    scores : (Integer, Integer)
-    puck : Puck
-    p1 : GameObject
-    p2 : GameObject
 
 public export
 DIMENSIONX:  Int
@@ -134,9 +111,6 @@ MAX_Y_VALUE = (cast DIMENSIONY) - 200
 public export
 MIN_Y_VALUE: Double
 MIN_Y_VALUE = 50
-
-public export
-data Rect = MkRect (Double, Double) (Double, Double)
 
 -- https://martin-thoma.com/how-to-check-if-two-line-segments-intersect/
 public export
