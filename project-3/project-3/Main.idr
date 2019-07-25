@@ -23,13 +23,13 @@ import Pong
 split_verts : VertList
 split_verts = [
   (0.0, 0.0, 0.0, 1.0),
-  (0.05, 0.0, 0.0, 1.0),
-  (0.0, 1, 0.0, 1.0),
-  (0.05, 1, 0.0, 1.0)
+  (0.025, 0.0, 0.0, 1.0),
+  (0.0, 2, 0.0, 1.0),
+  (0.025, 2, 0.0, 1.0)
   ]
 
 -- line_transform: TransformationMatrix
--- line_transform = 
+-- line_transform =
 
 errToStr : GLenum -> String
 errToStr err = case err of
@@ -232,9 +232,9 @@ draw (MkState win vao pvao svao (MkShaders _ _ prog ) (MkUniforms transform) pon
     glDrawElements GL_TRIANGLES 6 GL_UNSIGNED_INT prim__null
 
     -- Draw the line splitting the center of the screen
-    -- glUniformMatrix4fv transform 1 GL_FALSE (toList (toGl (translate [0.5, 0.0, 0.0, 1.0])))
-    -- glBindVertexArray (id svao)
-    -- glDrawElements GL_TRIANGLES 6 GL_UNSIGNED_INT prim__null
+    glUniformMatrix4fv transform 1 GL_FALSE (toList (toGl (translate [0, -1.0, 0.0])))
+    glBindVertexArray (id svao)
+    glDrawElements GL_TRIANGLES 6 GL_UNSIGNED_INT prim__null
 
     glfwSwapBuffers win
 

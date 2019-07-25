@@ -206,9 +206,9 @@ updatePuckVel pos@(x,y) (i, j) (c1, c2) (p1, p2) = if (x <= 0) || (x >= (cast DI
                                                      else if (y <= MIN_Y_VALUE) || (y >= MAX_Y_VALUE + 110) -- Bounce against top and bottom
                                                        then (i, -j)
                                                        else if c1
-                                                         then (-i, j)
+                                                         then ((abs i) + 0.05, j)
                                                          else if c2
-                                                           then (-i, j)
+                                                           then ((-abs i) - 0.05, j)
                                                            else (i, j)
 
 public export
@@ -231,7 +231,6 @@ public export
 worldXPosToScreenXPos: Double -> Double
 worldXPosToScreenXPos x = (x - HALF_DIMX) / HALF_DIMX
 
--- https://www.youtube.com/watch?v=6LJExJ7vpYg
 public export
 getPlayer1Transform: PongState -> TransformationMatrix
 getPlayer1Transform (MkPongState _ _ (MkGameObject _ (x :: y :: z :: _)) _) = translate [x, worldYPosToScreenYPos y, z]
@@ -272,9 +271,7 @@ updatePuck state@(MkPongState s (MkPuck (MkGameObject verts (x :: y :: z :: w)) 
 
   let colliding = col1 || col2
 
-  let (newx, newy) = if colliding
-                        then updatePuckPos DT (x, y) (-i, -j)
-                        else updatePuckPos DT (x, y) (i, j)
+  let (newx, newy) = updatePuckPos DT (x, y) (i, j)
   let (newi, newj) = updatePuckVel (newx, newy) (i, j) (col1, col2) (paddle1_rect, paddle2_rect)
 
   MkPuck (MkGameObject verts (newx :: newy :: z :: w)) (newi :: newj :: k :: l)
